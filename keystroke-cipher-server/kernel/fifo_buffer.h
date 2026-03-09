@@ -21,7 +21,7 @@ int fifo_read(struct fifo_buffer *fifo, struct keycipher_message *msg);
 void fifo_flush(struct fifo_buffer *fifo);
 int  fifo_count(struct fifo_buffer *fifo);
 
-extern struct fifo_buffer incoming_fifo;
-extern struct fifo_buffer outgoing_fifo;
+extern struct fifo_buffer inbox_fifo;
+extern struct fifo_buffer outbox_fifo;
 
 #endif
