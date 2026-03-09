@@ -81,3 +81,17 @@ void typing_stack_clear(struct typing_stack *stack)
     stack->top = 0;
 }
 
+/*
+ * typing_stack_drain copies message into buffer from stack
+ */
+int typing_stack_drain(struct typing_stack *stack, char *buf, int max_len)
+{
+    int n;
+
+    if (!stack || !buf || max_len <= 0)
+        return -1;
+
+    n = stack->top < max_len ? stack->top : max_len;
+    memcpy(buf, stack->data, n);
+    return n;
+}

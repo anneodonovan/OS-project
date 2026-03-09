@@ -16,6 +16,6 @@ void typing_stack_clear(struct typing_stack *stack);
 int typing_stack_is_empty(const struct typing_stack *stack);
 int typing_stack_is_full(const struct typing_stack *stack);
 int typing_stack_size(const struct typing_stack *stack);
+int typing_stack_drain(struct typing_stack *stack, char *buf, int max_len);// this is used for sending messages to the FIFO buffer from the LIFO stack
 
 #endif /* TYPING_STACK_H */
-
