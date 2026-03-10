@@ -10,6 +10,7 @@
 
 static int listen_fd;
 static int running = 1;
+static SSL_CTX *ssl_ctx;
 
 
 /*
@@ -22,6 +23,26 @@ static int running = 1;
 int server_init(int port)
 {
     struct sockaddr_in addr;
+    SSL_library_init();
+    OpenSSL_add_all_algorithms();
+
+     ssl_ctx = SSL_CTX_new(TLS_server_method());
+    if (!ssl_ctx) {
+        ERR_print_errors_fp(stderr);
+        return -1;
+    }
+
+    int cert_file = SSL_CTX_use_certificate_file(ssl_ctx, "cert.pem", SSL_FILETYPE_PEM);
+    if (cert_file <= 0) {
+        ERR_print_errors_fp(stderr);
+        return -1;
+    }
+
+    int priv_key_file = SSL_CTX_use_PrivateKey_file(ssl_ctx, "key.pem", SSL_FILETYPE_PEM);
+    if (priv_key_file <= 0) {
+        ERR_print_errors_fp(stderr);
+        return -1;
+    }
 
     listen_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (listen_fd < 0) {
@@ -49,6 +70,10 @@ int server_init(int port)
         perror("Listen Failed");
         return -1;
     }
+
+    pthread_t thread;
+    pthread_create(&thread, NULL, server_accept_loop, NULL);
+    pthread_detach(thread);
 
     printf("Server listening on port %d\n", port);
     return 0;
