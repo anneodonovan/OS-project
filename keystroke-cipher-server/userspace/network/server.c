@@ -1,6 +1,16 @@
 #include <stdio.h>
-#include <pthread.h>
+#include <pthread.h>       // threads for accept loop
 #include "server.h"
+#include <sys/socket.h>    // socket, bind, listen, accept
+#include <netinet/in.h>    // sockaddr_in, htons
+//#include <openssl/ssl.h>   // SSL_CTX, SSL_new, SSL_accept etc
+//#include <openssl/err.h>   // ERR_print_errors_fp for debugging
+#include <unistd.h>        // close()
+#include <arpa/inet.h>       //inet()
+
+static int listen_fd;
+static int running = 1;
+
 
 /*
  * server_init - set up SSL context and start listening
@@ -11,7 +21,36 @@
  */
 int server_init(int port)
 {
-    /* TODO: implement HTTPS server setup */
+    struct sockaddr_in addr;
+
+    listen_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (listen_fd < 0) {
+        printf("Socket failure\n");
+        return -1;
+    }
+
+    int opt = 1;
+    setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port = htons(port
+    );
+
+    int binder = bind(listen_fd, (struct sockaddr*)&addr, sizeof(addr));
+    if (binder < 0) {
+        perror("Bind Failed");
+        return -1;
+    }
+
+    int listener = listen(listen_fd, 10);
+    if (listener < 0) {
+        perror("Listen Failed");
+        return -1;
+    }
+
+    printf("Server listening on port %d\n", port);
     return 0;
 }
 
@@ -23,7 +62,22 @@ int server_init(int port)
  */
 void *server_accept_loop(void *arg)
 {
-    /* TODO: implement accept loop */
+    int client_fd;
+    struct sockaddr_in client_addr;
+    socklen_t addr_len = sizeof(client_addr);
+
+    while (running) {
+        printf("Waiting for connection...\n");
+        fflush(stdout); 
+        client_fd = accept(listen_fd, (struct sockaddr*)&client_addr, &addr_len);
+        if (client_fd < 0) {
+            perror("Accept failed");
+            continue;
+        }
+
+        printf("New connection from %s\n", inet_ntoa(client_addr.sin_addr));
+        close(client_fd);
+    }
     return NULL;
 }
 
@@ -51,4 +105,11 @@ void *server_handle_connection(void *arg)
 void server_stop(void)
 {
     /* TODO: implement server shutdown */
+}
+
+
+int main() {
+    server_init(8080);
+    server_accept_loop(NULL);
+    return 0;
 }
