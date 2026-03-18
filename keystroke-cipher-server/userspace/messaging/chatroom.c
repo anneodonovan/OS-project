@@ -97,7 +97,7 @@ int chatroom_receive(const char *encrypted_msg, const char *sender_ip)
     }
 
     ret = write(dev_fd, encrypted_msg, sizeof(kernel_msg_t));
-    clost(dev_fd);
+    close(dev_fd);
 
     if (ret < 0) {
         printf("chatroom_receive: FIFO full from %s\n", sender_ip);
@@ -159,6 +159,23 @@ void *chatroom_read_loop(void *arg)
  */
 int chatroom_get_semaphore_count(void)
 {
-    /* TODO: implement proc stats parsing */
-    return 0;
+    FILE *f;
+    char line[128];
+    int count = 0;
+
+    f = fopen(PROC_STATS, "r");
+    if (!f) {
+        perror("chatroom_get_semaphore_count: Cannot open proc stats");
+        return -1;
+    }
+
+    while (fgets(line, sizeof(line), f)) {
+        if (strncmp(line, "chatroom_free", 13) == 0) {
+            sscanf(line, "chatroom_free: %d", &count);
+            break;
+        }
+    }
+
+    fclose(f);
+    return count;
 }
