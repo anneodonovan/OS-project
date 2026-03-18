@@ -84,7 +84,25 @@ int chatroom_send(const char *plaintext)
  */
 int chatroom_receive(const char *encrypted_msg, const char *sender_ip)
 {
-    /* TODO: implement chatroom message receive */
+    int dev_fd;
+    int ret;
+
+    //returns immediately if full instead of blocking
+    dev_fd = open(DEVICE_CHATROOM, O_WRONLY | O_NONBLOCK);
+    if (dev_fd < 0) {
+        perror("chatroom_receive: cannot open device");
+        return -1;
+    }
+
+    ret = write(dev_fd, encrypted_msg, sizeof(kernel_msg_t));
+    clost(dev_fd);
+
+    if (ret < 0) {
+        printf("chatroom_receive: FIFO full from %s\n", sender_ip);
+        return -ENOBUFS;
+    }
+
+    printf("chatroom_receive: message stored from %s\n", sender_ip);
     return 0;
 }
 
