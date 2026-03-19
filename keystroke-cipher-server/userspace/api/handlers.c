@@ -28,8 +28,6 @@ void handle_get_stats(int client_fd) {
         return;
     }
 
-    //TODO: make sure proc file exists pls
-
     int incoming_used=0, incoming_free=0;
     int outgoing_used=0, outgoing_free=0;
     int chatroom_used=0, chatroom_free=0;
@@ -245,7 +243,6 @@ void handle_read_one(int client_fd, const char *message_id) {
     }
 
     //kernel decryption
-    //TODO: check this even works!
     kernel_msg_t kmsg;
     int fd = open("/dev/keycipher_in", O_RDONLY); //open as read only
     if (fd < 0) {

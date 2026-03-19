@@ -50,7 +50,7 @@ void *api_server_start(void *arg) {
 
     //local server
     addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = htonl(INADDR_ANY);  // 0.0.0.0
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);  //binds to all interfaces (both its 192.168.1.x addr and 127.0.0.1 localhost)
     addr.sin_port = htons(PORT);
 
     if (bind(server_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
@@ -70,6 +70,7 @@ void *api_server_start(void *arg) {
 
     //live server:
     while (1) {
+        //accepted client requests
         client_fd = accept(server_fd, (struct sockaddr*)&addr, &addrlen);
         if (client_fd < 0) {
             perror("accept");
