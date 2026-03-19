@@ -22,9 +22,9 @@ int direct_get_message_count(void) {
     return inbox_count;
 }
 
-/*user_msg_t *direct_get_messages(void) {
+user_msg_t *direct_get_messages(void) {
     return inbox;
-}*/
+}
 
 /*
  * direct_send - write plaintext to /dev/keycipher_out
