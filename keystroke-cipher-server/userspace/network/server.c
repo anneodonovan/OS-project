@@ -1,13 +1,13 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <pthread.h>       // threads for accept loop
-#include <sys/socket.h>    // socket, bind, listen, accept
-#include <netinet/in.h>    // sockaddr_in, htons
-#include <openssl/ssl.h>   // SSL_CTX, SSL_new, SSL_accept etc
-#include <openssl/err.h>   // ERR_print_errors_fp for debugging
-#include <unistd.h>        // close()
-#include <arpa/inet.h>       //inet()
+#include <pthread.h>       
+#include <sys/socket.h>   
+#include <netinet/in.h>    
+#include <openssl/ssl.h>   
+#include <openssl/err.h>   
+#include <unistd.h>        
+#include <arpa/inet.h>       
 #include "server.h"
 #include "../messaging/chatroom.h"
 #include "../messaging/direct.h"
@@ -24,11 +24,6 @@ static pthread_t accept_thread;
 #define ENC_QUEUE   "/tmp/keycipher_enc_queue"
 
 //Helpers for server_handle_connection
-/*
- parse_header - find a specific header value in raw HTTP request
- searches for "Header-Name: value\r\n" and copies value into out
- returns 1 if found, 0 if not found
- */
 static int parse_header(const char *request, const char *header_name, char *out, int out_len) {
     const char *p = strstr(request, header_name);
     if (!p) return 0;
@@ -46,11 +41,6 @@ static int parse_header(const char *request, const char *header_name, char *out,
     return 1;
 }
 
-/*
- parse_body - find message body after \r\n\r\n in HTTP request
- HTTP headers and body are always separated by a blank line
- returns pointer to start of body, NULL if not found (skips \r\n\r\n)
- */
 static const char *parse_body(const char *buf) {
     const char *body = strstr(buf, "\r\n\r\n");
     if (!body) {
@@ -60,16 +50,6 @@ static const char *parse_body(const char *buf) {
 }
 
 
-
-
-
-/*
- * server_init - set up SSL context and start listening
- * - SSL_CTX_new(TLS_server_method())
- * - SSL_CTX_use_certificate_file, SSL_CTX_use_PrivateKey_file
- * - socket, setsockopt, bind, listen
- * - pthread_create for server_accept_loop
- */
 int server_init(int port)
 {
     struct sockaddr_in addr;
@@ -134,12 +114,6 @@ int server_init(int port)
     return 0;
 }
 
-/*
- * server_accept_loop - continuously accept incoming peer connections
- * - while(running): SSL_accept on new connections
- * - for each connection: pthread_create(server_handle_connection)
- * - handle thread cleanup to avoid zombie threads
- */
 void *server_accept_loop(void *arg)
 {
     int client_fd;
@@ -173,15 +147,6 @@ void *server_accept_loop(void *arg)
     return NULL;
 }
 
-/*
- * server_handle_connection - process one peer HTTP request
- * - parse HTTP headers to get Content-Length, X-Sender-IP, X-Is-Chatroom
- * - read body (the encrypted message)
- * - check target FIFO (incoming or chatroom) for space
- * - if FIFO full: SSL_write HTTP 429 response and close
- * - if space: write message to FIFO, SSL_write HTTP 200 response
- * this is where backpressure is enforced at the receiving end
- */
 void *server_handle_connection(void *arg)
 {
     int client_fd = *(int*)arg;
@@ -202,7 +167,7 @@ void *server_handle_connection(void *arg)
         return NULL;
     }
 
-    // Read until we have the full headers (\r\n\r\n) — body may follow in hdrbuf
+    // Read until we have the full headers (\r\n\r\n) to find body
     int total = 0;
     while (total < (int)sizeof(hdrbuf) - 1) {
         int n = SSL_read(ssl, hdrbuf + total, sizeof(hdrbuf) - 1 - total);
@@ -223,7 +188,7 @@ void *server_handle_connection(void *arg)
 
     int msg_len = atoi(content_len_str);
 
-    // Locate where body starts inside hdrbuf
+    // Locate where body starts 
     const char *hdr_end = strstr(hdrbuf, "\r\n\r\n");
     if (!hdr_end || msg_len <= 0) {
         const char *bad = "HTTP/1.1 400 Bad Request\r\n\r\n";
@@ -235,7 +200,6 @@ void *server_handle_connection(void *arg)
     }
     hdr_end += 4; // skip past \r\n\r\n
 
-    // How many body bytes already arrived with the headers
     int body_in_hdr = total - (int)(hdr_end - hdrbuf);
 
     // Allocate exact-size body buffer
@@ -272,11 +236,11 @@ void *server_handle_connection(void *arg)
         if (msg_len >= (int)sizeof(kernel_msg_t)) {
             kernel_msg_t *kmsg = (kernel_msg_t *)body;
 
-            /* Inject sender IP into author field */
+            // Inject sender IP into author field 
             strncpy(kmsg->author, sender_ip, sizeof(kmsg->author) - 1);
             kmsg->author[sizeof(kmsg->author) - 1] = '\0';
 
-            /* Save encrypted data to queue file before kernel decrypts it */
+            // Save encrypted data to queue file before kernel decrypts it 
             FILE *enc_f = fopen(ENC_QUEUE, "ab");
             if (enc_f) {
                 char enc_record[256] = {0};
@@ -301,7 +265,7 @@ void *server_handle_connection(void *arg)
         ret = write(dev_fd, body, msg_len);
         close(dev_fd);
 
-        /* register in userspace inbox so API can show it in the frontend */
+        // Register in userspace inbox so API can show it in the frontend 
         if (ret > 0 && msg_len >= (int)sizeof(kernel_msg_t))
             direct_add_to_inbox((kernel_msg_t *)body);
     }
@@ -324,12 +288,6 @@ void *server_handle_connection(void *arg)
     return NULL;
 }
 
-/*
- * server_stop - shut down server cleanly
- * - set running = 0
- * - close listen_fd
- * - SSL_CTX_free(ssl_ctx)
- */
 void server_stop(void)
 {
     running = 0;

@@ -11,25 +11,11 @@
 #include "cipher.h"
 #include "typing_stack.h"
 
-/* Captures keystrokes from any keyboard (laptop, USB, Bluetooth) and pushes
-* them into the outgoing FIFO where they get encrypted by the kernel.
-*
-* How it works:
-*   1. keycipher_init() calls input_intercept_init() which calls input_register_handler(&keycipher_input_handler)
-*   2. The kernel scans all connected input devices and calls input_connect() for any that produce EV_KEY events
-*   3. input_connect() allocates an input_handle linking our handler to that specific keyboard
-*   4. From that point every keypress fires input_event_handler()
-*   5. We filter to key-press only (ignore release/repeat), convert keycode to ASCII via keycode_to_ascii[]
-*   6. We build a keycipher_message and call fifo_write() which encrypts via rot13 before storing
-*   7. keycipher_exit() calls input_intercept_exit() which calls input_unregister_handler() to unregister cleanly
-*/
-
-/* current_stack accumulates encrypted keypresses until Enter is pressed */
 static struct typing_stack current_stack;
 
-/*
- * Uses the linux network header files and prebuilt functions to get the MAC address of the machine.
- */
+
+//Uses the linux network header files and prebuilt functions to get the MAC address of the machine.
+ 
 static void get_author_mac(char *buf, size_t buf_len)
 {
     struct net_device *dev;
@@ -66,25 +52,15 @@ static const char keycode_to_ascii[256] = {
     [KEY_COMMA]=',',[KEY_MINUS]='-',
 };
 
-/*
- * input_event_handler - fired by the kernel on every key event
- * type: event type (EV_KEY, EV_SYN etc), code: which key, value: 0=release 1=press 2=repeat
- *
- * Flow:
- *   BACKSPACE  -> pop last encrypted char off current_stack
- *   ENTER      -> snapshot timestamp + author, copy stack into keycipher_message,
- *                 fifo_write() to outgoing_fifo, then clear the stack
- *   other key  -> ASCII lookup -> rot13_encrypt -> push onto current_stack
- */
 static void input_event_handler(struct input_handle *handle, unsigned int type, unsigned int code, int value)
 {
     char ch;
 
     if (type != EV_KEY) return;
-    if (value != 1) return; /* key-press only, ignore release and repeat */
+    if (value != 1) return; // key-press only, ignore release and repeat 
 
     if (code == KEY_BACKSPACE) {
-        typing_stack_pop(&current_stack, &ch); /* discard popped char */
+        typing_stack_pop(&current_stack, &ch); 
         return;
     }
 
@@ -114,12 +90,6 @@ static void input_event_handler(struct input_handle *handle, unsigned int type, 
     printk(KERN_DEBUG "KeyCipher: pushed encrypted char\n");
 }
 
-
-/*
- * input_connect - called by the kernel when it finds a keyboard matching key_ids
- * allocates an input_handle to link our handler to the device, then opens it
- * returns 0 on success, negative error code on failure
-*/
 static int input_connect(struct input_handler *handler, struct input_dev *dev,
                           const struct input_device_id *id)
 {
@@ -152,10 +122,6 @@ static int input_connect(struct input_handler *handler, struct input_dev *dev,
     return 0;
 }
 
-/*
- * input_disconnect - called when a keyboard is removed or the module unloads
- * closes the device, unregisters the handle and frees the allocated memory
- */
  static void input_disconnect(struct input_handle *handle)
  {
      const char *name = handle->dev->name;  // save name before freeing
@@ -165,24 +131,15 @@ static int input_connect(struct input_handler *handler, struct input_dev *dev,
      printk(KERN_INFO "KeyCipher: Device disconnected - %s\n", name);
  }
 
-/*
- * key_ids - match any device that produces EV_KEY events
- * catches all keyboards: laptop built-in, USB, and Bluetooth
- * empty struct at end is a required sentinel value this indicates the end of the table
- */
+/
 static const struct input_device_id key_ids[] = {
     {
         .flags = INPUT_DEVICE_ID_MATCH_EVBIT,
         .evbit = { BIT_MASK(EV_KEY) },
     },
-    { }, /* sentinel or flag required to terminate the table this indicates the end of the table */
+    { }, // sentinel or flag required to terminate the table this indicates the end of the table 
 };
 
-/*
- * keycipher_input_handler - wires our three callbacks to the input subsystem
- * .event = input_event_handler, .connect = input_connect, .disconnect = input_disconnect
- * .id_table = key_ids (any keyboard)
- */
 static struct input_handler keycipher_input_handler = {
     .event      = input_event_handler,
     .connect    = input_connect,
@@ -191,12 +148,6 @@ static struct input_handler keycipher_input_handler = {
     .id_table   = key_ids,
 };
 
-/*
- * input_intercept_init - called from keycipher_init() on module load
- * calls input_register_handler(&keycipher_input_handler) to register with the input subsystem
- * the kernel immediately calls input_connect() for any keyboard already present
- * returns 0 on success, negative error code on failure
- */
 int input_intercept_init(void)
 {
     int ret;
@@ -212,10 +163,6 @@ int input_intercept_init(void)
     return 0;
 }
 
-/*
- * input_intercept_exit - called from keycipher_exit() on module unload
- * calls input_unregister_handler(&keycipher_input_handler) to stop receiving events
- */
 void input_intercept_exit(void)
 {
     input_unregister_handler(&keycipher_input_handler);
