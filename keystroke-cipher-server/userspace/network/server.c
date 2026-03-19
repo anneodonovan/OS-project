@@ -142,12 +142,13 @@ void *server_accept_loop(void *arg)
 {
     int client_fd;
     struct sockaddr_in client_addr;
-    socklen_t addr_len = sizeof(client_addr);
 
     while (running) {
+        socklen_t addr_len = sizeof(client_addr);
+        
         printf("Waiting for connection...\n");
         fflush(stdout);
-
+        
         client_fd = accept(listen_fd, (struct sockaddr*)&client_addr, &addr_len);
         if (client_fd < 0) {
             perror("Accept failed");
@@ -166,6 +167,7 @@ void *server_accept_loop(void *arg)
         pthread_detach(thread);
 
         printf("New connection from %s\n", inet_ntoa(client_addr.sin_addr));
+        fflush(stdout);
     }
 
     return NULL;
