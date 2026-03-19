@@ -10,12 +10,16 @@ SRCS = main.c \
        api/api_server.c \
        api/handlers.c
 
-TARGET = keycipher_daemon
+TARGET  = keycipher_daemon
+INBOX   = inbox_terminal
 
-all: $(TARGET)
+all: $(TARGET) $(INBOX)
 
 $(TARGET): $(SRCS)
 	$(CC) $(CFLAGS) -o $@ $^
 
+$(INBOX): inbox_terminal.c
+	$(CC) -Wall -o $@ $^
+
 clean:
-	rm -f $(TARGET)
+	rm -f $(TARGET) $(INBOX)

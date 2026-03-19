@@ -3,6 +3,7 @@
   #include <signal.h>
   #include "network/server.h"
   #include "network/peer_manager.h"
+  #include "network/client.h"
   #include "messaging/direct.h"
   #include "messaging/chatroom.h"
 
@@ -17,7 +18,7 @@
 
   int main(int argc, char *argv[])
   {
-      pthread_t direct_thread, chatroom_thread;
+      pthread_t direct_thread, chatroom_thread, send_thread;
 
       printf("KeyCipher daemon starting...\n");
 
@@ -35,10 +36,22 @@
           fprintf(stderr, "Failed to start server\n");
           return 1;
       }
-      //connect to all peers
-      peer_manager_connect_all();
+      //connect to all peers — one SSL thread per peer
+      {
+          int count;
+          peer_t *peers = peer_get_all(&count);
+          for (int i = 0; i < count; i++) {
+              pthread_t t;
+              pthread_create(&t, NULL, client_connect_thread, &peers[i]);
+              pthread_detach(t);
+          }
+      }
 
-      //thread: blocking reads from /dev/keycipher_in
+      //thread: drain outbox_fifo → broadcast to peers
+      pthread_create(&send_thread, NULL, direct_send_loop, NULL);
+      pthread_detach(send_thread);
+
+      //thread: blocking reads from /dev/keycipher_in (used by inbox_terminal, not here)
       pthread_create(&direct_thread, NULL, direct_receive_loop, NULL);
       pthread_detach(direct_thread);
 

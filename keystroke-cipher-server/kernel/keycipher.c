@@ -48,11 +48,72 @@ static int keycipher_release(struct inode *inode, struct file *file)
 }
 
 /*
- * keycipher_read - reads one message from incoming_fifo, decrypts it, copies to userspace
- * blocks if incoming_fifo is empty (fifo_read does down on slots_used internally)
+ * keycipher_out_read - drain one message from outbox_fifo for the network layer
+ * blocks until a message is available (input_intercept fills outbox_fifo on ENTER)
+ * NO decrypt — message is already ROT13-encrypted by input_intercept
  */
-static ssize_t keycipher_read(struct file *file, char __user *buf,
-                               size_t len, loff_t *offset)
+static ssize_t keycipher_out_read(struct file *file, char __user *buf,
+                                   size_t len, loff_t *offset)
+{
+    struct keycipher_message msg;
+    int ret;
+
+    if (len < sizeof(msg))
+        return -EINVAL;
+
+    ret = fifo_read(&outbox_fifo, &msg);
+    if (ret)
+        return ret;
+
+    if (copy_to_user(buf, &msg, sizeof(msg)))
+        return -EFAULT;
+
+    return sizeof(msg);
+}
+
+/*
+ * keycipher_in_write - store one incoming encrypted message into inbox_fifo
+ * called by server.c when a peer message arrives over P2P
+ * NO re-encrypt — message is already ROT13-encrypted by the sender's kernel
+ * if O_NONBLOCK and inbox is full: return -EAGAIN (server.c sends HTTP 429)
+ */
+static ssize_t keycipher_in_write(struct file *file, const char __user *buf,
+                                   size_t len, loff_t *offset)
+{
+    struct keycipher_message msg;
+
+    if (len < sizeof(msg))
+        return -EINVAL;
+
+    if (copy_from_user(&msg, buf, sizeof(msg)))
+        return -EFAULT;
+
+    if (file->f_flags & O_NONBLOCK) {
+        /* Non-blocking: return -EAGAIN if full so server sends HTTP 429 */
+        if (down_trylock(&inbox_fifo.slots_free))
+            return -EAGAIN;
+    } else {
+        if (down_interruptible(&inbox_fifo.slots_free))
+            return -ERESTARTSYS;
+    }
+
+    mutex_lock(&inbox_fifo.lock);
+    inbox_fifo.messages[inbox_fifo.tail] = msg;
+    inbox_fifo.tail = (inbox_fifo.tail + 1) % FIFO_SIZE;
+    inbox_fifo.count++;
+    mutex_unlock(&inbox_fifo.lock);
+    up(&inbox_fifo.slots_used);
+
+    return sizeof(msg);
+}
+
+/*
+ * keycipher_in_read - pop one message from inbox_fifo and decrypt it for the user
+ * blocks until a message is available
+ * called by inbox_terminal when user presses Enter
+ */
+static ssize_t keycipher_in_read(struct file *file, char __user *buf,
+                                  size_t len, loff_t *offset)
 {
     struct keycipher_message msg;
     int ret;
@@ -68,31 +129,6 @@ static ssize_t keycipher_read(struct file *file, char __user *buf,
 
     if (copy_to_user(buf, &msg, sizeof(msg)))
         return -EFAULT;
-
-    return sizeof(msg);
-}
-
-/*
- * keycipher_write - copies one message from userspace, encrypts it, pushes to outgoing_fifo
- * blocks if outgoing_fifo is full (fifo_write does down on slots_free internally)
- */
-static ssize_t keycipher_write(struct file *file, const char __user *buf,
-                                size_t len, loff_t *offset)
-{
-    struct keycipher_message msg;
-    int ret;
-
-    if (len < sizeof(msg))
-        return -EINVAL;
-
-    if (copy_from_user(&msg, buf, sizeof(msg)))
-        return -EFAULT;
-
-    rot13_encrypt(msg.data, msg.len);
-
-    ret = fifo_write(&outbox_fifo, &msg);
-    if (ret)
-        return ret;
 
     return sizeof(msg);
 }
@@ -132,12 +168,23 @@ static long keycipher_ioctl(struct file *file, unsigned int cmd,
     return 0;
 }
 
-static struct file_operations fops = {
+/* /dev/keycipher_out — outbox: network layer reads encrypted messages to send */
+static struct file_operations fops_out = {
     .owner          = THIS_MODULE,
     .open           = keycipher_open,
     .release        = keycipher_release,
-    .read           = keycipher_read,
-    .write          = keycipher_write,
+    .read           = keycipher_out_read,   /* reads outbox_fifo, no decrypt */
+    .unlocked_ioctl = keycipher_ioctl,
+};
+
+/* /dev/keycipher_in — inbox: server writes incoming encrypted messages;
+ *                            inbox_terminal reads + decrypts on user Enter */
+static struct file_operations fops_in = {
+    .owner          = THIS_MODULE,
+    .open           = keycipher_open,
+    .release        = keycipher_release,
+    .write          = keycipher_in_write,   /* writes inbox_fifo, no re-encrypt */
+    .read           = keycipher_in_read,    /* reads inbox_fifo, decrypts */
     .unlocked_ioctl = keycipher_ioctl,
 };
 
@@ -150,7 +197,7 @@ static int __init keycipher_init(void)
         return ret;
     }
 
-    cdev_init(&cdev_out, &fops);
+    cdev_init(&cdev_out, &fops_out);
     cdev_out.owner = THIS_MODULE;
     ret = cdev_add(&cdev_out, MKDEV(MAJOR(dev_base), MINOR_OUT), 1);
     if (ret) {
@@ -158,8 +205,7 @@ static int __init keycipher_init(void)
         goto err_unreg;
     }
 
-    
-    cdev_init(&cdev_in, &fops);
+    cdev_init(&cdev_in, &fops_in);
     cdev_in.owner = THIS_MODULE;
     ret = cdev_add(&cdev_in, MKDEV(MAJOR(dev_base), MINOR_IN), 1);
     if (ret) {

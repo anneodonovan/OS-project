@@ -71,6 +71,43 @@ int direct_send(peer_t *peer, const char *plaintext)
 }
 
 /*
+ * direct_send_loop - blocking read loop on /dev/keycipher_out
+ * pops each encrypted outbox message and broadcasts it to all connected peers
+ * blocks if outbox_fifo is empty (kernel semaphore)
+ * if a peer's inbox is full, client_send_message handles the 429 backpressure retry
+ */
+void *direct_send_loop(void *arg)
+{
+    kernel_msg_t msg;
+    int dev_fd;
+    int bytes;
+
+    dev_fd = open(DEVICE_OUT, O_RDONLY);
+    if (dev_fd < 0) {
+        perror("direct_send_loop: failed to open device");
+        return NULL;
+    }
+
+    printf("direct_send_loop: started, waiting for outbox messages...\n");
+
+    while (1) {
+        bytes = read(dev_fd, &msg, sizeof(msg));
+        if (bytes < 0) {
+            perror("direct_send_loop: read failure");
+            break;
+        }
+        if (bytes == 0) continue;
+
+        printf("direct_send_loop: sending message from %s (%d chars)\n",
+               msg.author, msg.len);
+        client_broadcast((const char *)&msg, sizeof(msg), 0);
+    }
+
+    close(dev_fd);
+    return NULL;
+}
+
+/*
  * direct_receive_loop - blocking read loop on /dev/keycipher_in
  * - open("/dev/keycipher_in", O_RDONLY)
  * - while(1): read(fd, buf, MAX_MESSAGE_LEN)

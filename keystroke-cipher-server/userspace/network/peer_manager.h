@@ -1,6 +1,6 @@
 #ifndef PEER_MANAGER_H
 #define PEER_MANAGER_H
-
+#include <openssl/ssl.h>  
 #define MAX_PEERS 16
 
 typedef enum {
@@ -14,6 +14,8 @@ typedef struct {
     int           port;
     peer_status_t status;
     int           socket_fd;
+    SSL          *ssl;
+    SSL_CTX      *ctx;
 } peer_t;
 
 int     peer_manager_init(const char *config_file);
