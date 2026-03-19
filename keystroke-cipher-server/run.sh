@@ -6,10 +6,15 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 echo "Run as: (1) Sender  (2) Receiver"
 read -p "Choice: " choice
 
-# Build and load kernel module
+# Kill any existing daemon and free the port
+sudo pkill -f keycipher_daemon 2>/dev/null || true
+sleep 1
+
+# Reload kernel module cleanly to clear stale FIFOs
 cd "$SCRIPT_DIR/kernel"
 make -s
-sudo insmod keycipher_mod.ko 2>/dev/null || true
+sudo rmmod keycipher_mod 2>/dev/null || true
+sudo insmod keycipher_mod.ko
 
 # Get major number
 MAJOR=$(cat /proc/devices | grep keycipher | awk '{print $1}')
