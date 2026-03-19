@@ -21,9 +21,6 @@ static int msg_to_json(const kernel_msg_t *msg, char *buf, int buflen)
     );
 }
 
-/*
- * handle_get_stats - return JSON with buffer levels and peer statuses
- */
 void handle_get_stats(int client_fd) {
     FILE *fp = fopen("/proc/keycipher/stats", "r");
     if (!fp) {
@@ -88,9 +85,6 @@ void handle_get_stats(int client_fd) {
         strlen(json), json);
 }
 
-/*
- * handle_get_messages - return JSON array of messages currently in inbox
- */
 void handle_get_messages(int client_fd) {
     kernel_msg_t *msgs = direct_get_inbox();
     int count = direct_get_inbox_count();
@@ -111,9 +105,6 @@ void handle_get_messages(int client_fd) {
         strlen(json), json);
 }
 
-/*
- * handle_get_outbox - return JSON array of outbox messages with waiting status
- */
 void handle_get_outbox(int client_fd) {
     kernel_msg_t *msgs    = direct_get_outbox();
     int          *waiting = direct_get_outbox_waiting();
@@ -138,10 +129,7 @@ void handle_get_outbox(int client_fd) {
         strlen(json), json);
 }
 
-/*
- * handle_read_one - pop the front message from inbox_fifo, kernel decrypts it
- * returns the same message struct fields but with plaintext in data field
- */
+//decrypts 1 message
 void handle_read_one(int client_fd, const char *message_id) {
     (void)message_id; /* FIFO always pops front */
 
@@ -174,9 +162,7 @@ void handle_read_one(int client_fd, const char *message_id) {
         strlen(json), json);
 }
 
-/*
- * handle_read_all - pop every message from inbox_fifo, kernel decrypts each
- */
+//decrypts all
 void handle_read_all(int client_fd) {
     FILE *fp = fopen("/proc/keycipher/stats", "r");
     int count = 0;

@@ -1,8 +1,4 @@
-/**
- * server.js — Node.js bridge between frontend and C backend API
- * HTML <──WebSocket──> Node.js <──HTTP──> C API server
- *                                   <──/proc──> /proc/keycipher/stats
- */
+//server.js — Node.js bridge between frontend and C backend API
 
 const express    = require('express');
 const http       = require('http');

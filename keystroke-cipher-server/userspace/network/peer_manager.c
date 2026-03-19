@@ -11,10 +11,7 @@
 static peer_t peers[MAX_PEERS];
 static int peer_count = 0;
 
-/*open config_file (peers.conf)
-  parse each non-comment line as an IP address
-  populate peers[] with ip, default port 8443, PEER_OFFLINE status
-  return number of peers loaded */
+//set up from config file
 int peer_manager_init(const char *config_file_name) {
     char buf[MAX_LINE];
     peer_count = 0; //clear just in case re-init
@@ -60,26 +57,19 @@ int peer_manager_init(const char *config_file_name) {
     return peer_count;
 }
 
-/*set *count = peer_count
-  return peers[] array pointer
-  used by handlers.c for GET /api/peers */
+//getters:
 peer_t *peer_get_all(int *count){
     *count = peer_count; //updates count
     return peers; //returns peer list
 }
-
 peer_t *peer_manager_get_all(void) {
     return peers;
 }
-
 int peer_manager_count(void) {
     return peer_count;
 }
 
-/*loops through all loaded peers
-attempt a TCP connection to each
-update socket_fd and status accordingly
-return how many succeeded*/
+//attempts TCP connections with all peers
 int peer_manager_connect_all() {
     int sockets_connected = 0;
 
@@ -132,10 +122,7 @@ int peer_manager_connect_all() {
     return sockets_connected; // connection worked
 }
 
-/* find peer in peers[] by IP string match
-    update peer->status
-    PEER_BLOCKED causes frontend to show spinner on that peer
-    PEER_CONNECTED resumes normal send flow */
+//sets connection status
 void peer_set_status(const char *ip, peer_status_t status){
     if (!ip) return;
     for (int i=0; i < peer_count; i++) {
@@ -148,8 +135,7 @@ void peer_set_status(const char *ip, peer_status_t status){
     }
 }
 
-/* close all open socket_fd connections
-    reset peer_count to 0 */
+//clears all connections
 void peer_manager_cleanup(void){
     for (int i=0; i < peer_count; i++) {
         //check for valid fd -> 0, 1, 2 are std_in, out, err, so fd must be >= 3
@@ -161,22 +147,3 @@ void peer_manager_cleanup(void){
     }
     peer_count = 0;
 }
-
-/* TEST PLS REMOVE*/
-/*int main(void) {
-    printf("Read IP count: %d\n", peer_manager_init("../../peers.conf"));
-
-    for (int i=0; i < peer_count; i++) {
-        printf("\t- IP READ IN: %s:%d (STATUS - %d)\n", peers[i].ip, peers[i].port, peers[i].status);
-    }
-    peer_manager_connect_all();
-
-    peer_set_status("192.168.1.240", 1);
-
-    for (int i=0; i < peer_count; i++) {
-        printf("\t- IP READ IN: %s:%d (STATUS - %d)\n", peers[i].ip, peers[i].port, peers[i].status);
-    }
-
-    return 0;
-}*/
-/* END: TEST PLS REMOVE*/

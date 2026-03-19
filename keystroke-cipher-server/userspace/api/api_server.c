@@ -18,20 +18,7 @@ static const char *extract_body(const char *req) {
     return body ? body + 4 : "";
 }
 
-/*
- * api_server_start - start HTTP server on localhost:8080 for Node.js bridge
- * - bind to 127.0.0.1:8080 only (not exposed externally, Node.js bridges it)
- * - listen and accept connections in a loop
- * - for each connection: parse HTTP method + path, route to correct handler
- * - supported routes:
- *     GET  /api/stats           → handle_get_stats
- *     GET  /api/messages        → handle_get_messages
- *     GET  /api/chatroom        → handle_get_chatroom
- *     POST /api/read/:id        → handle_read_one
- *     POST /api/read/all        → handle_read_all
- *     POST /api/send            → handle_send_direct
- *     POST /api/send/chatroom   → handle_send_chatroom
- */
+//starts HTTP server (localhost:8080) to communicate with NodeJS frontend
 void *api_server_start(void *arg) {
     //new socket setup
     int server_fd, client_fd;
