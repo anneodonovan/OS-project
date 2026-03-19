@@ -36,13 +36,7 @@ int direct_get_messages(user_msg_t *out, int max) {
     return n;
 }
 
-/*
- * direct_send - write plaintext to /dev/keycipher_out
- * - open("/dev/keycipher_out", O_WRONLY)
- * - write(fd, plaintext, len) - kernel encrypts and puts in outgoing FIFO
- * - close(fd)
- * - client layer then reads outgoing FIFO and sends to peer
- */
+
 int direct_send(peer_t *peer, const char *plaintext)
 {
     kernel_msg_t msg;
@@ -52,7 +46,7 @@ int direct_send(peer_t *peer, const char *plaintext)
     int bytes;
 
     memset(&msg, 0, sizeof(msg));
-    strncpy(msg.data, plaintext, sizeof(msg.data) - 1); // strncpy Limits how many bytes copied preventing overflowing the buffer
+    strncpy(msg.data, plaintext, sizeof(msg.data) - 1);
     msg.len = strlen(plaintext);
 
     dev_fd = open(DEVICE_OUT, O_WRONLY);
@@ -85,14 +79,6 @@ int direct_send(peer_t *peer, const char *plaintext)
     return client_send_message(peer, (const char*)&encrypted, 0);
 }
 
-/*
- * direct_receive_loop - blocking read loop on /dev/keycipher_in
- * - open("/dev/keycipher_in", O_RDONLY)
- * - while(1): read(fd, buf, MAX_MESSAGE_LEN)
- *   - read BLOCKS if FIFO is empty (kernel semaphore)
- *   - kernel decrypts before returning data to userspace
- *   - store message in a userspace queue for API to serve to frontend
- */
 void *direct_receive_loop(void *arg)
 {
     kernel_msg_t msg;

@@ -1,13 +1,13 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <pthread.h>       // threads for accept loop
-#include <sys/socket.h>    // socket, bind, listen, accept
-#include <netinet/in.h>    // sockaddr_in, htons
-#include <openssl/ssl.h>   // SSL_CTX, SSL_new, SSL_accept etc
-#include <openssl/err.h>   // ERR_print_errors_fp for debugging
-#include <unistd.h>        // close()
-#include <arpa/inet.h>       //inet()
+#include <pthread.h>       
+#include <sys/socket.h>    
+#include <netinet/in.h>    
+#include <openssl/ssl.h>   
+#include <openssl/err.h>   
+#include <unistd.h>        
+#include <arpa/inet.h>       
 #include "server.h"
 #include "../messaging/chatroom.h"
 #include <fcntl.h>
@@ -22,11 +22,6 @@ static pthread_t accept_thread;
 #define DEVICE_PATH "/dev/keycipher_in"
 
 //Helpers for server_handle_connection
-/*
- parse_header - find a specific header value in raw HTTP request
- searches for "Header-Name: value\r\n" and copies value into out
- returns 1 if found, 0 if not found
- */
 static int parse_header(const char *request, const char *header_name, char *out, int out_len) {
     const char *p = strstr(request, header_name);
     if (!p) return 0;
@@ -44,11 +39,6 @@ static int parse_header(const char *request, const char *header_name, char *out,
     return 1;
 }
 
-/*
- parse_body - find message body after \r\n\r\n in HTTP request
- HTTP headers and body are always separated by a blank line
- returns pointer to start of body, NULL if not found (skips \r\n\r\n)
- */
 static const char *parse_body(const char *buf) {
     const char *body = strstr(buf, "\r\n\r\n");
     if (!body) {
@@ -57,17 +47,6 @@ static const char *parse_body(const char *buf) {
     return body + 4; 
 }
 
-
-
-
-
-/*
- * server_init - set up SSL context and start listening
- * - SSL_CTX_new(TLS_server_method())
- * - SSL_CTX_use_certificate_file, SSL_CTX_use_PrivateKey_file
- * - socket, setsockopt, bind, listen
- * - pthread_create for server_accept_loop
- */
 int server_init(int port)
 {
     struct sockaddr_in addr;
@@ -132,12 +111,6 @@ int server_init(int port)
     return 0;
 }
 
-/*
- * server_accept_loop - continuously accept incoming peer connections
- * - while(running): SSL_accept on new connections
- * - for each connection: pthread_create(server_handle_connection)
- * - handle thread cleanup to avoid zombie threads
- */
 void *server_accept_loop(void *arg)
 {
     int client_fd;
@@ -145,7 +118,7 @@ void *server_accept_loop(void *arg)
 
     while (running) {
         socklen_t addr_len = sizeof(client_addr);
-        
+
         printf("Waiting for connection...\n");
         fflush(stdout);
         
@@ -173,15 +146,7 @@ void *server_accept_loop(void *arg)
     return NULL;
 }
 
-/*
- * server_handle_connection - process one peer HTTP request
- * - parse HTTP headers to get Content-Length, X-Sender-IP, X-Is-Chatroom
- * - read body (the encrypted message)
- * - check target FIFO (incoming or chatroom) for space
- * - if FIFO full: SSL_write HTTP 429 response and close
- * - if space: write message to FIFO, SSL_write HTTP 200 response
- * this is where backpressure is enforced at the receiving end
- */
+
 void *server_handle_connection(void *arg)
 {
     int client_fd = *(int*)arg;
@@ -276,12 +241,6 @@ void *server_handle_connection(void *arg)
 
 }
 
-/*
- * server_stop - shut down server cleanly
- * - set running = 0
- * - close listen_fd
- * - SSL_CTX_free(ssl_ctx)
- */
 void server_stop(void)
 {
     running = 0;
