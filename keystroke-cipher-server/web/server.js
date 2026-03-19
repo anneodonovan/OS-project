@@ -11,12 +11,14 @@ const cors       = require('cors');
 const axios      = require('axios');
 const fs         = require('fs');
 const path       = require('path');
+const httpAgent  = new (require('http').Agent)({ keepAlive: false });
 
 const app        = express();
 const httpServer = http.createServer(app);
 const io         = new Server(httpServer, { cors: { origin: '*' } });
 
 const C_BACKEND_URL = 'http://localhost:8080';
+const backendAxios  = axios.create({ httpAgent });
 const PROC_STATS    = '/proc/keycipher/stats';
 const PORT          = 3001;
 
@@ -62,12 +64,38 @@ app.get('/api/stats', (req, res) => {
 });
 
 /* ─────────────────────────────────────────────────────────────── */
+/* GET /api/peers — proxy to C backend stats, extract peers        */
+/* ─────────────────────────────────────────────────────────────── */
+
+app.get('/api/peers', async (req, res) => {
+    try {
+        const response = await backendAxios.get(`${C_BACKEND_URL}/api/stats`);
+        res.json(response.data.peers || []);
+    } catch (err) {
+        res.status(500).json({ error: 'C backend unreachable' });
+    }
+});
+
+/* ─────────────────────────────────────────────────────────────── */
+/* GET /api/outbox — proxy to C backend                            */
+/* ─────────────────────────────────────────────────────────────── */
+
+app.get('/api/outbox', async (req, res) => {
+    try {
+        const response = await backendAxios.get(`${C_BACKEND_URL}/api/outbox`);
+        res.json(response.data);
+    } catch (err) {
+        res.status(500).json({ error: 'C backend unreachable' });
+    }
+});
+
+/* ─────────────────────────────────────────────────────────────── */
 /* GET /api/messages — proxy to C backend                          */
 /* ─────────────────────────────────────────────────────────────── */
 
 app.get('/api/messages', async (req, res) => {
     try {
-        const response = await axios.get(`${C_BACKEND_URL}/api/messages`);
+        const response = await backendAxios.get(`${C_BACKEND_URL}/api/messages`);
         res.json(response.data);
     } catch (err) {
         res.status(500).json({ error: 'C backend unreachable' });
@@ -80,7 +108,7 @@ app.get('/api/messages', async (req, res) => {
 
 app.get('/api/chatroom', async (req, res) => {
     try {
-        const response = await axios.get(`${C_BACKEND_URL}/api/chatroom`);
+        const response = await backendAxios.get(`${C_BACKEND_URL}/api/chatroom`);
         res.json(response.data);
     } catch (err) {
         res.status(500).json({ error: 'C backend unreachable' });
@@ -93,10 +121,10 @@ app.get('/api/chatroom', async (req, res) => {
 
 app.post('/api/read/:id', async (req, res) => {
     try {
-        const response = await axios.post(`${C_BACKEND_URL}/api/read/${req.params.id}`);
-        const plaintext = response.data.plaintext;
+        const response = await backendAxios.post(`${C_BACKEND_URL}/api/read/${req.params.id}`);
+        const { sender, plaintext, timestamp } = response.data;
 
-        io.emit('message_read', { id: req.params.id, plaintext });
+        io.emit('message_read', { sender, plaintext, timestamp });
 
         // update stats after read
         fs.readFile(PROC_STATS, 'utf8', (err, data) => {
@@ -115,7 +143,7 @@ app.post('/api/read/:id', async (req, res) => {
 
 app.post('/api/read/all', async (req, res) => {
     try {
-        const response = await axios.post(`${C_BACKEND_URL}/api/read/all`);
+        const response = await backendAxios.post(`${C_BACKEND_URL}/api/read/all`);
         const decryptedMessages = response.data.messages;
 
         io.emit('flush', { messages: decryptedMessages });
@@ -137,7 +165,7 @@ app.post('/api/read/all', async (req, res) => {
 
 app.post('/api/send', async (req, res) => {
     try {
-        const response = await axios.post(`${C_BACKEND_URL}/api/send`, req.body);
+        const response = await backendAxios.post(`${C_BACKEND_URL}/api/send`, req.body);
 
         io.emit('message_sent', {
             target_ip: req.body.target_ip,
@@ -156,7 +184,7 @@ app.post('/api/send', async (req, res) => {
 
 app.post('/api/send/chatroom', async (req, res) => {
     try {
-        const response = await axios.post(`${C_BACKEND_URL}/api/send/chatroom`, req.body);
+        const response = await backendAxios.post(`${C_BACKEND_URL}/api/send/chatroom`, req.body);
 
         io.emit('chatroom_message', {
             sender: 'me',
