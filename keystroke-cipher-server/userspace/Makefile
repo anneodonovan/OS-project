@@ -1,5 +1,6 @@
-CC     = gcc
-CFLAGS = -Wall -Wextra -pthread -lssl -lcrypto
+CC      = gcc
+CFLAGS  = -Wall -Wextra
+LDFLAGS = -pthread -lssl -lcrypto
 
 SRCS = main.c \
        network/server.c \
@@ -16,7 +17,7 @@ INBOX   = inbox_terminal
 all: $(TARGET) $(INBOX)
 
 $(TARGET): $(SRCS)
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 $(INBOX): inbox_terminal.c
 	$(CC) -Wall -o $@ $^
