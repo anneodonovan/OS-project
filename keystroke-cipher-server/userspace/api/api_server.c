@@ -50,7 +50,7 @@ void *api_server_start(void *arg) {
 
     //local server
     addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = inet_addr("127.0.0.1");   // local only
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);  // 0.0.0.0
     addr.sin_port = htons(PORT);
 
     if (bind(server_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
