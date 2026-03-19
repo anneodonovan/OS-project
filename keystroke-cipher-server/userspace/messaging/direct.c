@@ -16,7 +16,7 @@ static kernel_msg_t outbox[MAX_MESSAGES];
 static int outbox_waiting[MAX_MESSAGES]; /* 1 = blocked, 0 = sent */
 static int outbox_count = 0;
 
-/* inbox accessors */
+// inbox accessors 
 int direct_get_inbox_count(void)  { return inbox_count; }
 kernel_msg_t *direct_get_inbox(void) { return inbox; }
 
@@ -40,10 +40,7 @@ int direct_get_outbox_count(void)    { return outbox_count; }
 kernel_msg_t *direct_get_outbox(void) { return outbox; }
 int *direct_get_outbox_waiting(void)  { return outbox_waiting; }
 
-/*
- * direct_send_loop - blocks on /dev/keycipher_out waiting for keyboard intercept
- * to push an encrypted message, then broadcasts to all peers
- */
+
 void *direct_send_loop(void *arg)
 {
     (void)arg;
@@ -63,7 +60,7 @@ void *direct_send_loop(void *arg)
         if (bytes < 0) { perror("direct_send_loop: read failure"); break; }
         if (bytes == 0) continue;
 
-        /* add to outbox as waiting */
+        // add to outbox as waiting 
         int idx = -1;
         if (outbox_count < MAX_MESSAGES) {
             idx = outbox_count;
@@ -75,10 +72,10 @@ void *direct_send_loop(void *arg)
         printf("direct_send_loop: broadcasting message from %s (%d chars)\n",
                msg.author, msg.len);
 
-        /* client_broadcast blocks internally on 429 backpressure until delivered */
+        // client_broadcast blocks internally on 429 backpressure until delivered 
         client_broadcast((const char *)&msg, sizeof(msg), 0);
 
-        /* mark sent */
+        // mark sent 
         if (idx >= 0)
             outbox_waiting[idx] = 0;
     }
