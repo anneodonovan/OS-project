@@ -80,3 +80,10 @@ int fifo_count(struct fifo_buffer *fifo)
 {
     return fifo->count;
 }
+
+int fifo_incoming_used(void)  { return inbox_fifo.count; }
+int fifo_incoming_free(void)  { return FIFO_SIZE - inbox_fifo.count; }
+int fifo_outgoing_used(void)  { return outbox_fifo.count; }
+int fifo_outgoing_free(void)  { return FIFO_SIZE - outbox_fifo.count; }
+int fifo_chatroom_used(void)  { return chatroom_fifo.count; }
+int fifo_chatroom_free(void)  { return FIFO_SIZE - chatroom_fifo.count; }
