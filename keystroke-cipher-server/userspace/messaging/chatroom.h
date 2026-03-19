@@ -1,6 +1,17 @@
 #ifndef CHATROOM_H
 #define CHATROOM_H
 
+#define MAX_CHAT_MESSAGES 64
+//Kernel msg struct
+typedef struct {
+    long long tv_sec;
+    long      tv_nsec;
+    char      author[64];
+    char      data[256];
+    int       len;
+    int       is_chatroom;
+} kernel_msg_t;
+
 //Userspace msg struct
 typedef struct {
     int id;
@@ -8,6 +19,8 @@ typedef struct {
     long timestamp;
     char encrypted_preview[256];  
 } chat_msg_t;
+
+
 /*
  * chatroom_send - send an encrypted message to all peers via chatroom buffer
  * - write to /dev/keycipher_out (kernel encrypts)
@@ -45,6 +58,6 @@ int chatroom_get_semaphore_count(void);
 
 
 int chatroom_get_message_count(void);
-chat_msg_t *chatroom_get_messages(void);
+int chatroom_get_messages(chat_msg_t *out, int max);
 
 #endif /* CHATROOM_H */

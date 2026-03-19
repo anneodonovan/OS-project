@@ -3,35 +3,38 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
+#include <pthread.h> 
 #include "chatroom.h"
 #include "../network/client.h"
-
-
-static chat_msg_t chat_inbox[MAX_CHAT_MESSAGES];
-static int chat_inbox_count = 0;
-static int next_chat_id = 1;*/
-
-//TODO: also these getter funcs
-int chatroom_get_message_count(void) {
-    return chat_inbox_count;
-}
-
-chat_msg_t *chatroom_get_messages(void) {
-    return chat_inbox;
-}*/
 
 #define DEVICE_OUT       "/dev/keycipher_out"
 #define DEVICE_CHATROOM  "/dev/keycipher_chatroom"
 #define PROC_STATS       "/proc/keycipher/stats"
 
-typedef struct {
-    long long tv_sec;
-    long      tv_nsec;
-    char      author[64];
-    char      data[256];
-    int       len;
-    int       is_chatroom;
-} kernel_msg_t;
+static chat_msg_t chat_inbox[MAX_CHAT_MESSAGES];
+static int chat_inbox_count = 0;
+static int next_chat_id = 1;
+static pthread_mutex_t chat_lock = PTHREAD_MUTEX_INITIALIZER;
+
+int chatroom_get_message_count(void) {
+    pthread_mutex_lock(&chat_lock);
+    int count = chat_inbox_count;
+    pthread_mutex_unlock(&chat_lock);
+    return count;
+}
+
+int chatroom_get_messages(chat_msg_t *out, int max) {
+    int n;
+    pthread_mutex_lock(&chat_lock);
+    if (chat_inbox_count < max) {
+        n = chat_inbox_count;
+    } else {
+        n = max;
+    }
+    memcpy(out, chat_inbox, n * sizeof(chat_msg_t));
+    pthread_mutex_unlock(&chat_lock);
+    return n;
+}
 
 /*
  * chatroom_send - encrypt via kernel then broadcast to all peers
@@ -158,6 +161,18 @@ void *chatroom_read_loop(void *arg)
 
            //slot freed
            printf("CHATROOM (%s): %.*s\n", msg.author, msg.len, msg.data);
+
+           pthread_mutex_lock(&chat_lock);
+           if (chat_inbox_count < MAX_CHAT_MESSAGES) { 
+                chat_inbox[chat_inbox_count].id = next_chat_id++;
+                chat_inbox[chat_inbox_count].timestamp = msg.tv_sec;
+                strncpy(chat_inbox[chat_inbox_count].sender, msg.author, 63);
+                strncpy(chat_inbox[chat_inbox_count].encrypted_preview, msg.data, 255);
+               chat_inbox_count++;
+            } else {
+                printf("chatroom_read_loop: Inbox full, dropping message\n");
+            }
+            pthread_mutex_unlock(&chat_lock);
     }
     
     close(dev_fd);

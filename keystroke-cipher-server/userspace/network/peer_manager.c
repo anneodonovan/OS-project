@@ -154,21 +154,4 @@ void peer_manager_cleanup(void){
     peer_count = 0;
 }
 
-/* TEST PLS REMOVE*/
-/*int main(void) {
-    printf("Read IP count: %d\n", peer_manager_init("../../peers.conf"));
 
-    for (int i=0; i < peer_count; i++) {
-        printf("\t- IP READ IN: %s:%d (STATUS - %d)\n", peers[i].ip, peers[i].port, peers[i].status);
-    }
-    peer_manager_connect_all();
-
-    peer_set_status("192.168.1.240", 1);
-
-    for (int i=0; i < peer_count; i++) {
-        printf("\t- IP READ IN: %s:%d (STATUS - %d)\n", peers[i].ip, peers[i].port, peers[i].status);
-    }
-
-    return 0;
-}*/
-/* END: TEST PLS REMOVE*/

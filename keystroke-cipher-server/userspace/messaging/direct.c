@@ -3,22 +3,37 @@
 #include <time.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <pthread.h>
 #include "direct.h"
 #include "../network/client.h"
 
 #define DEVICE_OUT "/dev/keycipher_out"
 #define DEVICE_IN "/dev/keycipher_in"
 
+
 static user_msg_t inbox[MAX_MESSAGES];
 static int inbox_count = 0;
 static int next_id = 1;
+static pthread_mutex_t inbox_lock  = PTHREAD_MUTEX_INITIALIZER;
 
 int direct_get_message_count(void) {
-    return inbox_count;
+    pthread_mutex_lock(&inbox_lock);
+    int count = inbox_count;
+    pthread_mutex_unlock(&inbox_lock);
+    return count;
 }
 
-user_msg_t *direct_get_messages(void) {
-    return inbox;
+int direct_get_messages(user_msg_t *out, int max) {
+    int n;
+    pthread_mutex_lock(&inbox_lock);
+    if (inbox_count < max) {
+        n = inbox_count;
+    } else {
+        n = max;
+    }
+    memcpy(out, inbox, n * sizeof(user_msg_t));
+    pthread_mutex_unlock(&inbox_lock);
+    return n;
 }
 
 /*
@@ -101,14 +116,18 @@ void *direct_receive_loop(void *arg)
         if (bytes == 0) continue;
 
         printf("%s: %.*s\n", msg.author, msg.len, msg.data);
-
+        
+        pthread_mutex_lock(&inbox_lock);
         if (inbox_count < MAX_MESSAGES) {
             inbox[inbox_count].id = next_id++;
             strncpy(inbox[inbox_count].sender, msg.author, 63);
             inbox[inbox_count].timestamp = msg.tv_sec;
             strncpy(inbox[inbox_count].encrypted_preview, msg.data, 255);
             inbox_count++;
+        } else {
+            printf("direct_receive_loop: Inbox full, dropping message\n");
         }
+        pthread_mutex_unlock(&inbox_lock);
     
     }
 

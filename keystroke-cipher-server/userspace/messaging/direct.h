@@ -1,5 +1,6 @@
 #ifndef DIRECT_H
 #define DIRECT_H
+#define MAX_MESSAGES 64
 
 #include "../network/peer_manager.h"
 
@@ -37,6 +38,6 @@ typedef struct {
 } user_msg_t;
 
 int direct_get_message_count(void);
-user_msg_t *direct_get_messages(void);
+int direct_get_messages(user_msg_t *out, int max);
 
 #endif /* DIRECT_H */
